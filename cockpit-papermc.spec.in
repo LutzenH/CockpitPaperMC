@@ -1,0 +1,29 @@
+Name: cockpit-papermc
+Version: @VERSION@
+Release: 1%{?dist}
+Summary: A Cockpit module for running a PaperMC server
+License: LGPLv2+
+
+Source: cockpit-papermc-%{version}.tar.gz
+BuildArch: noarch
+BuildRequires:  libappstream-glib
+
+Requires: cockpit-system
+
+%define debug_package %{nil}
+
+%description
+A Cockpit module for running a PaperMC server
+
+%prep
+%setup -n cockpit-papermc
+
+%install
+%make_install
+appstream-util validate-relax --nonet %{buildroot}/%{_datadir}/metainfo/*
+
+%files
+%{_datadir}/cockpit/*
+%{_datadir}/metainfo/*
+
+%changelog
