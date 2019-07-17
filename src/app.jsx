@@ -19,6 +19,7 @@
 
 import cockpit from 'cockpit';
 import React from 'react';
+import MessageTable from './table.jsx';
 import './app.scss';
 
 const RenderServerErrorMessage = (message) => (
@@ -27,7 +28,7 @@ const RenderServerErrorMessage = (message) => (
             <span className="pficon pficon-close" />
         </button>
         <span className="pficon pficon-error-circle-o" />
-        <strong>Error: { message }</strong>
+        <strong>Error: {message}</strong>
     </div>
 );
 
@@ -43,9 +44,11 @@ export class Application extends React.Component {
         super();
 
         this.state = {
+            'tab': _(0),
             'isRunning': _(false),
+            'rawLog': _(""),
             'output': _(""),
-            'error':  _(""),
+            'error': _(""),
             'inputValue': _("")
         };
 
@@ -56,6 +59,7 @@ export class Application extends React.Component {
         this.proc = null;
 
         this.serverReconnect();
+        this.retrieveLogInfo();
     }
 
     serverStart() {
@@ -63,11 +67,11 @@ export class Application extends React.Component {
 
         var options = {
             "directory": papermc_directory,
-            "environ": [ "TERM=xterm-256color" ],
+            "environ": ["TERM=xterm-256color"],
             "pty": true
         };
 
-        this.proc = cockpit.spawn(["screen", "-S", screen_session_name, "java", "-server", "-jar", papermc_jar_filename, "nogui"], options);
+        this.proc = cockpit.spawn(["screen", "-S", screen_session_name, "java", "-server", "-Xmx8192M", "-XX:+UseConcMarkSweepGC", "-jar", papermc_jar_filename, "nogui"], options);
         this.proc.done(() => this.serverDone());
         this.proc.stream((data) => this.serverOutput(data));
         this.proc.fail((exception) => this.serverFailed(exception));
@@ -80,7 +84,7 @@ export class Application extends React.Component {
     serverReconnect() {
         var options = {
             "directory": papermc_directory,
-            "environ": [ "TERM=xterm-256color" ],
+            "environ": ["TERM=xterm-256color"],
             "pty": true
         };
 
@@ -93,6 +97,25 @@ export class Application extends React.Component {
             return true;
         else
             return false;
+    }
+
+    retrieveLogInfo() {
+        cockpit.file(papermc_directory + 'logs/latest.log').watch(content => {
+            var splitLog = content.split("\n");
+
+            var loginfo = [];
+
+            splitLog.forEach(element => {
+                loginfo.push({
+                    important: true,
+                    time: "00:00",
+                    message: element,
+                    service: "Service"
+                });
+            });
+
+            this.setState({ rawLog: loginfo });
+        });
     }
 
     serverDone() {
@@ -113,9 +136,9 @@ export class Application extends React.Component {
 
     RenderStartStopButton() {
         if (this.state.isRunning)
-            return <button className="btn btn-danger float-right" id="stop-server" onClick={() => this.serverStop() }>Stop Server</button>;
+            return <button className="btn btn-danger float-right" id="stop-server" onClick={() => this.serverStop()}>Stop Server</button>;
         else
-            return <button className="btn btn-primary float-right" id="start-server" onClick={() => this.serverStart() }>Start Server</button>;
+            return <button className="btn btn-primary float-right" id="start-server" onClick={() => this.serverStart()}>Start Server</button>;
     }
 
     serverSendInput() {
@@ -134,37 +157,99 @@ export class Application extends React.Component {
         }
     }
 
-    render() {
+    RenderConsole() {
         return (
             <div className="panel panel-default">
-                <div className="container-fluid panel-heading">
-                    <div className="btn-group pull-left">
-                        <button type="button" className="btn btn-default">Dashboard</button>
-                        <button type="button" className="btn btn-default">Console</button>
-                        <a type="button" className="btn btn-default" href={dynmap_url} target="_blank">Dynmap</a>
-                    </div>
-                    <div className="pull-right text-right">
-                        { this.RenderStartStopButton() }
-                    </div>
+                <div className="panel-heading">
+                    <h3 className="panel-title">Console</h3>
                 </div>
                 <div className="panel-body">
-                    { this.state.error }
-                    <div className="panel panel-default">
-                        <div className="panel-heading">
-                            <h3 className="panel-title">Console</h3>
-                        </div>
-                        <div className="panel-body">
-                            <pre style={{ height: "256px", overflowX: "hidden" }}>
-                                { this.state.output }
-                            </pre>
-                            <div className="input-group">
-                                <input type="text" className="form-control" value={this.state.inputValue} onChange={this.updateInput} disabled={!this.state.isRunning} />
-                                <span className="input-group-btn">
-                                    <button type="button" className="btn btn-default" onClick={() => this.serverSendInput() } onKeyPress={this.inputKeyPressed} disabled={!this.state.isRunning}>Send</button>
-                                </span>
-                            </div>
-                        </div>
+                    <pre style={{ height: "256px", overflowX: "hidden" }}>
+                        {this.state.output}
+                    </pre>
+                    <div className="input-group">
+                        <input type="text" className="form-control" value={this.state.inputValue} onChange={this.updateInput} disabled={!this.state.isRunning} />
+                        <span className="input-group-btn">
+                            <button type="button" className="btn btn-default" onClick={() => this.serverSendInput()} onKeyPress={this.inputKeyPressed} disabled={!this.state.isRunning}>Send</button>
+                        </span>
                     </div>
+                </div>
+            </div>
+        );
+    }
+
+    RenderDashboard() {
+        return (
+            <div className="panel panel-default">
+                <div className="panel-heading">
+                    <h3 className="panel-title">Dashboard</h3>
+                </div>
+                <div className="panel-body">
+                    <p>dashboard</p>
+                </div>
+            </div>
+        );
+    }
+
+    RenderLogs() {
+        return (
+            <MessageTable messages={this.state.rawLog} />
+        );
+    }
+
+    RenderPanelBody() {
+        switch (this.state.tab) {
+        case 0:
+            return this.RenderDashboard();
+        case 1:
+            return this.RenderConsole();
+        case 2:
+            return this.RenderLogs();
+        }
+    }
+
+    RenderHeaderButtons() {
+        var classNameRegular = "btn btn-default";
+        var classNameActive = "btn btn-default active";
+
+        var classNameDashboardButton = classNameRegular;
+        var classNameConsoleButton = classNameRegular;
+        var classNameLogsButton = classNameRegular;
+
+        switch (this.state.tab) {
+        case 0:
+            classNameDashboardButton = classNameActive;
+            break;
+        case 1:
+            classNameConsoleButton = classNameActive;
+            break;
+        case 2:
+            classNameLogsButton = classNameActive;
+            break;
+        }
+
+        return (
+            <div className="btn-group pull-left">
+                <button type="button" className={classNameDashboardButton} onClick={() => this.setState({ tab: 0 })}>Dashboard</button>
+                <button type="button" className={classNameConsoleButton} onClick={() => this.setState({ tab: 1 })}>Console</button>
+                <button type="button" className={classNameLogsButton} onClick={() => this.setState({ tab: 2 })}>Logs</button>
+                <a type="button" className="btn btn-default" href={dynmap_url} target="_blank">Dynmap</a>
+            </div>
+        );
+    }
+
+    render() {
+        return (
+            <div>
+                <div className="content-header-extra">
+                    {this.RenderHeaderButtons()}
+                    <div className="pull-right text-right">
+                        {this.RenderStartStopButton()}
+                    </div>
+                </div>
+                <div id="journal-box" className="container-fluid">
+                    {this.state.error}
+                    {this.RenderPanelBody()}
                 </div>
             </div>
         );
