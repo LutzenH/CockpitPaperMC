@@ -90,7 +90,10 @@ export class ChartPie extends React.Component {
         };
 
         return (
-            <PieChart data={ chartData } legend={self.legend} size={self.size} />
+            <p>
+                { this.props.worldName }
+                <PieChart data={ chartData } legend={self.legend} size={self.size} />
+            </p>
         );
     }
 }

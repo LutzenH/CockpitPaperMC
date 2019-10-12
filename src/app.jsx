@@ -197,11 +197,18 @@ export class Application extends React.Component {
     }
 
     RenderDashboard() {
-        let entityData = [];
+        let components = [];
 
-        if (this.state.entities.world !== undefined) {
-            for (let [key, value] of Object.entries(this.state.entities.world)) {
-                entityData.push([key, value]);
+        if (this.state.entities !== undefined) {
+            for (let [world_name, world] of Object.entries(this.state.entities)) {
+                if (world !== undefined) {
+                    let worldEntities = [];
+                    for (let [entity, amount] of Object.entries(world)) {
+                        worldEntities.push([entity, amount]);
+                    }
+
+                    components.push(<ChartPie worldName={ world_name } data={ worldEntities } />);
+                }
             }
         }
 
@@ -211,7 +218,7 @@ export class Application extends React.Component {
                     <h3 className="panel-title">Dashboard</h3>
                 </div>
                 <div className="panel-body">
-                    <ChartPie data={ entityData } />
+                    { components }
                 </div>
             </div>
         );
