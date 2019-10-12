@@ -21,6 +21,7 @@ import cockpit from 'cockpit';
 import React from 'react';
 import MessageTable from './table.jsx';
 import './app.scss';
+import { ChartPie } from "./pieChart.jsx";
 
 const RenderServerErrorMessage = (message) => (
     <div className="alert alert-danger alert-dismissable">
@@ -49,8 +50,14 @@ export class Application extends React.Component {
             'rawLog': _(""),
             'output': _(""),
             'error': _(""),
-            'inputValue': _("")
+            'inputValue': _(""),
+
+            'entities': _(""),
+            'players': _(""),
+            'plugins': _(""),
         };
+
+        this.retrieveGameInfo();
 
         this.updateInput = this.updateInput.bind(this);
         this.serverSendInput = this.serverSendInput.bind(this);
@@ -71,7 +78,7 @@ export class Application extends React.Component {
             "pty": true
         };
 
-        this.proc = cockpit.spawn(["screen", "-S", screen_session_name, "java", "-server", "-Xmx8192M", "-XX:+UseConcMarkSweepGC", "-jar", papermc_jar_filename, "nogui"], options);
+        this.proc = cockpit.spawn(["screen", "-S", screen_session_name, "java", "-Xms16G", "-Xmx16G", "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:MaxGCPauseMillis=100", "-XX:+DisableExplicitGC", "-XX:TargetSurvivorRatio=90", "-XX:G1NewSizePercent=50", "-XX:G1MaxNewSizePercent=80", "-XX:G1MixedGCLiveThresholdPercent=35", "-XX:+AlwaysPreTouch", "-XX:+ParallelRefProcEnabled", "-Dusing.aikars.flags=mcflags.emc.gs", "-jar", papermc_jar_filename, "nogui"], options);
         this.proc.done(() => this.serverDone());
         this.proc.stream((data) => this.serverOutput(data));
         this.proc.fail((exception) => this.serverFailed(exception));
@@ -82,7 +89,7 @@ export class Application extends React.Component {
     }
 
     serverReconnect() {
-        var options = {
+        const options = {
             "directory": papermc_directory,
             "environ": ["TERM=xterm-256color"],
             "pty": true
@@ -93,17 +100,14 @@ export class Application extends React.Component {
         this.proc.stream((data) => this.serverOutput(data));
         this.proc.fail((exception) => this.setState(() => ({ 'isRunning': false })));
 
-        if (this.state.isRunning)
-            return true;
-        else
-            return false;
+        return this.state.isRunning;
     }
 
     retrieveLogInfo() {
         cockpit.file(papermc_directory + 'logs/latest.log').watch(content => {
-            var splitLog = content.split("\n");
+            const splitLog = content.split("\n");
 
-            var loginfo = [];
+            const loginfo = [];
 
             splitLog.forEach(element => {
                 loginfo.push({
@@ -115,6 +119,20 @@ export class Application extends React.Component {
             });
 
             this.setState({ rawLog: loginfo });
+        });
+    }
+
+    retrieveGameInfo() {
+        cockpit.file(papermc_directory + 'plugins/CockpitPaperMC/entities.json').watch(content => {
+            this.setState({ entities: JSON.parse(content) });
+        });
+
+        cockpit.file(papermc_directory + 'plugins/CockpitPaperMC/players.json').watch(content => {
+            this.setState({ players: JSON.parse(content) });
+        });
+
+        cockpit.file(papermc_directory + 'plugins/CockpitPaperMC/plugins.json').watch(content => {
+            this.setState({ plugins: JSON.parse(content) });
         });
     }
 
@@ -179,13 +197,21 @@ export class Application extends React.Component {
     }
 
     RenderDashboard() {
+        let entityData = [];
+
+        if (this.state.entities.world !== undefined) {
+            for (let [key, value] of Object.entries(this.state.entities.world)) {
+                entityData.push([key, value]);
+            }
+        }
+
         return (
             <div className="panel panel-default">
                 <div className="panel-heading">
                     <h3 className="panel-title">Dashboard</h3>
                 </div>
                 <div className="panel-body">
-                    <p>dashboard</p>
+                    <ChartPie data={ entityData } />
                 </div>
             </div>
         );
@@ -209,11 +235,11 @@ export class Application extends React.Component {
     }
 
     RenderHeaderButtons() {
-        var classNameRegular = "btn btn-default";
-        var classNameActive = "btn btn-default active";
+        const classNameRegular = "btn btn-default";
+        const classNameActive = "btn btn-default active";
 
-        var classNameDashboardButton = classNameRegular;
-        var classNameConsoleButton = classNameRegular;
+        let classNameDashboardButton = classNameRegular;
+        let classNameConsoleButton = classNameRegular;
         var classNameLogsButton = classNameRegular;
 
         switch (this.state.tab) {
